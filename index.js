@@ -79,6 +79,7 @@ async function createNewPost(article, id, index, totalArticles) {
     console.log(json.article.title)
     console.log("Article " + count + " of " + totalArticles + " created.")
     console.log("==============================================================")
+    return
 }
 
 app.post('/shopify/blogs/create-article', async (req, res) => {
