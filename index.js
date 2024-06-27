@@ -26,6 +26,7 @@ const shopify_api_secret_key = process.env.SHOPIFY_API_SECRET_KEY
 const shopify_admin_api_access_token = process.env.SHOPIFY_ADMIN_API_ACCESS_TOKEN
 const shopify_storefront_api_access_token = process.env.SHOPIFY_STOREFRONT_API_ACCESS_TOKEN
 
+
 app.get('/api', (req, res) => {
     res.json({ 
         message: 'hi from the server!'
@@ -81,34 +82,39 @@ async function createNewPost(article, id, index, totalArticles) {
 }
 
 app.post('/shopify/blogs/create-article', async (req, res) => {
-    let newArticle
-    let blogId = req.body.blog.id
-    let numberOfArticles = req.body.articles.length - 1 
-    console.log(req.body.articles)
-    console.log("number of articles to upload: " + numberOfArticles)
-    for (let i = 0; i < req.body.articles.length; i++) {
-        newArticle = {
-            "article": {
-                "title" : req.body.articles[i].title,
-                "author" : req.body.articles[i].author,
-                "body_html" : req.body.articles[i].body_html,
-                "published": false,
-                "excerpt": req.body.articles[i].excerpt,
-                "image": {
-                    "src": req.body.articles[i].image.src,
-                },
-                "tags": req.body.articles[i].tags,
-                "handle": req.body.articles[i].slug
+    if (req.headers.api_key !== process.env.API_KEY) {
+        res.send({ "status": 403, "message" : "Nope" })
+        return
+    } else {
+        let newArticle
+        let blogId = req.body.blog.id
+        let numberOfArticles = req.body.articles.length - 1 
+        console.log(req.body.articles)
+        console.log("number of articles to upload: " + numberOfArticles)
+        for (let i = 0; i < req.body.articles.length; i++) {
+            newArticle = {
+                "article": {
+                    "title" : req.body.articles[i].title,
+                    "author" : req.body.articles[i].author,
+                    "body_html" : req.body.articles[i].body_html,
+                    "published": false,
+                    "excerpt": req.body.articles[i].excerpt,
+                    "image": {
+                        "src": req.body.articles[i].image.src,
+                    },
+                    "tags": req.body.articles[i].tags,
+                    "handle": req.body.articles[i].slug
+                }
             }
-        }
-        try {
-            await createNewPost(newArticle, blogId, i, req.body.articles.length)
-            await waitforme(1000)
-            if (i === numberOfArticles) {
-                res.send({ message: "all done!" })
+            try {
+                await createNewPost(newArticle, blogId, i, req.body.articles.length)
+                await waitforme(1000)
+                if (i === numberOfArticles) {
+                    res.send({ message: "all done!" })
+                }
+            } catch (error) {
+                res.send({ error: error })
             }
-        } catch (error) {
-            res.send({ error: error })
         }
     }
 
@@ -164,43 +170,49 @@ async function getWordpressMedia(url, id) {
 
 app.post('/wordpress/blogs/get-all-posts', async (req, res) => {
     console.log('lets do it!')
-    let posts = []
-    let url = req.body.url
-    const response = await fetch(`${url}/wp-json/wp/v2/posts?per_page=5`, {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
-    })
-    const json = await response.json()
-    for (let i = 0; i < json.length; i++) {
-        console.log("Here's a post!")
-        const author = await getWordpressAuthor(url, json[i].author)
-        let tags = []
-        for (let j = 0; j < json[i].tags.length; j++) {
-            const tag = await getWordpressTag(url, json[i].tags[j])
-            tags.push(tag)
-        }
-        const featuredImage = await getWordpressMedia(url, json[i].featured_media)
-        let post = {
-            "title": json[i].title.rendered,
-            "date": json[i].date,
-            "author": author.name,
-            "body_html": json[i].content.rendered,
-            "published": false,
-            "excerpt": json[i].excerpt.rendered,
-            "image": {
-                "src": featuredImage.source_url,
-            },
-            "tags": tags.join(', ')
-        }
-        posts.push(post)
-        if (i === json.length - 1) {
-            res.send({ 
-                message: "all done!", 
-                posts: posts
-            })
+    if (req.headers.api_key !== process.env.API_KEY) {
+        res.send({ "status": 403, "message" : "Nope" })
+        return
+    } else {
+        let posts = []
+        let url = req.body.url
+        const response = await fetch(`${url}/wp-json/wp/v2/posts?per_page=5`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        })
+        const json = await response.json()
+        for (let i = 0; i < json.length; i++) {
+            console.log("Here's a post!")
+            const author = await getWordpressAuthor(url, json[i].author)
+            let tags = []
+            for (let j = 0; j < json[i].tags.length; j++) {
+                const tag = await getWordpressTag(url, json[i].tags[j])
+                tags.push(tag)
+            }
+            const featuredImage = await getWordpressMedia(url, json[i].featured_media)
+            let post = {
+                "title": json[i].title.rendered,
+                "date": json[i].date,
+                "author": author.name,
+                "body_html": json[i].content.rendered,
+                "published": false,
+                "excerpt": json[i].excerpt.rendered,
+                "image": {
+                    "src": featuredImage.source_url,
+                },
+                "tags": tags.join(', ')
+            }
+            posts.push(post)
+            if (i === json.length - 1) {
+                res.send({ 
+                    status: 200,
+                    message: "all done!", 
+                    posts: posts
+                })
+            }
         }
     }
 })
